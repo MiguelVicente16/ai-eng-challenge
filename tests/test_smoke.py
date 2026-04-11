@@ -3,4 +3,5 @@
 
 def test_imports():
     import src.config
+
     assert src.config is not None
