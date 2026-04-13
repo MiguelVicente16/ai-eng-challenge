@@ -1,0 +1,55 @@
+# Routing rules per service. The Specialist's LLM prompt is built from these.
+# Frontend-editable later — YAML is the schema.
+
+services:
+  investments:
+    label: "Investments"
+    dept_phone: "+1999888001"
+    yes_rules:
+      - "Customer mentions stocks, bonds, portfolio, or investment products"
+      - "Customer asks about retirement savings or pension plans"
+      - "Customer wants to buy or sell securities"
+    no_rules:
+      - "Customer is asking about everyday banking (deposits, withdrawals)"
+      - "Customer is reporting a lost or stolen card"
+
+  insurance:
+    label: "Insurance"
+    dept_phone: "+1999888002"
+    yes_rules:
+      - "Customer mentions insurance policies, claims, or premiums"
+      - "Customer asks about home, auto, life, yacht, or travel coverage"
+      - "Customer wants to file a claim"
+    no_rules:
+      - "Customer is asking about loans or mortgages"
+      - "Customer is asking about account balance"
+
+  loans:
+    label: "Loans & Mortgages"
+    dept_phone: "+1999888003"
+    yes_rules:
+      - "Customer mentions a loan, mortgage, or refinancing"
+      - "Customer asks about interest rates on borrowing"
+      - "Customer wants a credit check or loan application"
+    no_rules:
+      - "Customer is asking about savings account interest"
+      - "Customer is asking about investment products"
+
+  cards:
+    label: "Cards"
+    dept_phone: "+1999888004"
+    yes_rules:
+      - "Customer mentions a credit or debit card"
+      - "Customer reports a lost, stolen, or fraudulent card transaction"
+      - "Customer asks about card limits, PINs, or activation"
+    no_rules:
+      - "Customer is asking about a loan"
+      - "Customer is asking about investments"
+
+  general:
+    label: "General Support"
+    dept_phone: "+1999888000"
+    yes_rules:
+      - "Customer has a general question not covered by a specific service"
+      - "Customer is unsure what they need"
+    no_rules: []
