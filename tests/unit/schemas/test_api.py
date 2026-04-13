@@ -31,3 +31,23 @@ def test_chat_response_should_store_response_and_session_id_when_provided():
     # Assert
     assert actual.response == "Hi there!"
     assert actual.session_id == "sess-42"
+
+
+def test_chat_request_should_accept_caller_phone_when_provided():
+    from src.schemas.api import ChatRequest
+
+    # Act
+    actual = ChatRequest(message="Hi", caller_phone="+1122334455")
+
+    # Assert
+    assert actual.caller_phone == "+1122334455"
+
+
+def test_chat_request_should_default_caller_phone_to_none_when_omitted():
+    from src.schemas.api import ChatRequest
+
+    # Act
+    actual = ChatRequest(message="Hi")
+
+    # Assert
+    assert actual.caller_phone is None

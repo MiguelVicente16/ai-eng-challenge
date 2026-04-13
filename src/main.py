@@ -2,7 +2,10 @@
 
 from fastapi import FastAPI
 
+from src.logging_config import setup_logging
 from src.routers.chat import router as chat_router
+
+setup_logging()
 
 app = FastAPI(
     title="DEUS Bank AI Support",

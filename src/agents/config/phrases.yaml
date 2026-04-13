@@ -1,0 +1,70 @@
+# Customer-facing phrases used by the responder node.
+# Variables use Python str.format() style: {name}, {phone}, etc.
+# NEVER put these under LLM control — they are pre-approved by the bank.
+
+opener_known_caller: >-
+  Hi {name}! I'm the DEUS Bank digital assistant. This call is recorded
+  for quality and compliance. How can I help you today?
+
+opener_unknown_caller: >-
+  Hello, I'm the DEUS Bank digital assistant. This call is recorded for
+  quality and compliance. How can I help you today?
+
+auth_kickoff_known_caller: >-
+  Thank you. To verify it's really you, could you please confirm your
+  name and IBAN?
+
+auth_kickoff_unknown_caller: >-
+  Thank you. To help you, I need to verify your identity. Could you
+  please tell me your name and either your phone number or IBAN?
+
+greeter_need_more_info: >-
+  I still need a bit more information to verify you. Could you please
+  also share your {missing_field}?
+
+greeter_identity_not_found: >-
+  I'm sorry, I couldn't match your details to an account. Please double
+  check and try again, or contact your local branch.
+
+verifier_ask_secret: >-
+  Thank you. For security, I need to ask your secret question: {secret_question}
+
+verifier_success: >-
+  Thank you, your identity is verified.
+
+retry_unclear_problem: >-
+  I'm sorry, I didn't catch that. Could you please tell me again what
+  you need help with?
+
+retry_unclear_identity: >-
+  I'm sorry, I didn't quite catch that. Could you please share your
+  identity details once more?
+
+retry_unclear_secret: >-
+  I'm sorry, I didn't catch your answer. Could you please repeat it?
+
+fallback_to_general: >-
+  I'm sorry, I wasn't able to help you directly. Let me transfer you to
+  our general support team at {dept_phone}.
+
+premium_response: >-
+  Thank you for reaching out, {name}. As a premium client, we value your
+  experience and our {service_label} team is ready to assist you. Please
+  contact our dedicated premium support at {dept_phone}.
+
+regular_response: >-
+  Thanks for reaching out, {name}. I'll route you to our {service_label}
+  team. Please contact our support department at {dept_phone}.
+
+non_customer_response: >-
+  Thank you for reaching out. It appears you are not currently a client
+  of DEUS Bank. We recommend contacting your own bank's support
+  department for assistance.
+
+guardrails_fallback: >-
+  Thank you for contacting DEUS Bank. For assistance, please call our
+  support line at {dept_phone}.
+
+session_ended: >-
+  This call has ended. Please start a new conversation if you need
+  further assistance. Thank you for choosing DEUS Bank.

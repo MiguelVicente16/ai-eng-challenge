@@ -4,12 +4,31 @@ import pytest
 
 
 @pytest.fixture
-def client():
+def mock_service(mocker):
+    service = mocker.MagicMock()
+
+    async def _handle(request):
+        from src.schemas.api import ChatResponse
+
+        return ChatResponse(
+            response="Welcome",
+            session_id=request.session_id or "generated-session",
+        )
+
+    service.handle_message = _handle
+    return service
+
+
+@pytest.fixture
+def client(mock_service):
     from fastapi.testclient import TestClient
 
     from src.main import app
+    from src.routers.chat import get_chat_service
 
-    return TestClient(app)
+    app.dependency_overrides[get_chat_service] = lambda: mock_service
+    yield TestClient(app)
+    app.dependency_overrides.clear()
 
 
 def test_health_should_return_ok(client):
@@ -31,10 +50,8 @@ def test_chat_should_return_200_with_response_and_session_id(client):
     # Assert
     assert actual.status_code == 200
     data = actual.json()
-    assert "response" in data
+    assert data["response"] == "Welcome"
     assert "session_id" in data
-    assert isinstance(data["session_id"], str)
-    assert len(data["session_id"]) > 0
 
 
 def test_chat_should_preserve_session_id_when_provided(client):

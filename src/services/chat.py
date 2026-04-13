@@ -1,44 +1,65 @@
-"""Chat service — orchestrates conversation flow.
+"""Chat service — invokes the LangGraph agent for each incoming message."""
 
-This service manages session state and delegates to agents.
-Agent logic (greeter, bouncer, specialist, guardrails) is
-plugged in by the next phase.
-"""
-
+import logging
+import time
 import uuid
 
+from src.agents.graph import build_graph
+from src.data import CUSTOMERS
+from src.logging_config import mask, trim
 from src.schemas.api import ChatRequest, ChatResponse
+
+logger = logging.getLogger(__name__)
+
+
+def _lookup_customer_by_phone(phone: str) -> tuple[bool, str | None]:
+    """Return (recognized, known_name) for a caller phone lookup."""
+    for customer in CUSTOMERS:
+        if customer.phone == phone:
+            return True, customer.name
+    return False, None
 
 
 class ChatService:
-    """Orchestrates the multi-agent conversation flow."""
+    """Orchestrates the multi-agent conversation via the LangGraph."""
 
     def __init__(self) -> None:
-        self._sessions: dict[str, dict] = {}
+        self._graph = build_graph()
 
-    def handle_message(self, request: ChatRequest) -> ChatResponse:
-        """Process an incoming chat message and return a response.
-
-        Manages session lifecycle. Agent logic is plugged in later.
-        """
+    async def handle_message(self, request: ChatRequest) -> ChatResponse:
+        """Run the graph for this message under the session's thread_id."""
         session_id = request.session_id or str(uuid.uuid4())
+        config = {"configurable": {"thread_id": session_id}}
 
-        if session_id not in self._sessions:
-            self._sessions[session_id] = {
-                "messages": [],
-                "verification_stage": "collecting_info",
+        start = time.perf_counter()
+        snapshot = await self._graph.aget_state(config)
+
+        if snapshot.values:
+            inputs: dict = {"input_text": request.message}
+            logger.info("turn on %s: %s", session_id[:8], trim(request.message, 60))
+        else:
+            inputs = {
+                "input_text": request.message,
+                "stage": "new_session",
             }
+            if request.caller_phone:
+                recognized, known_name = _lookup_customer_by_phone(request.caller_phone)
+                inputs["caller_phone"] = request.caller_phone
+                inputs["caller_recognized"] = recognized
+                if recognized:
+                    inputs["extracted_phone"] = request.caller_phone
+                    inputs["known_name_hint"] = known_name
+                caller_desc = f"caller ID {mask(request.caller_phone)}"
+            else:
+                caller_desc = "no caller ID"
+            logger.info("new session %s — %s", session_id[:8], caller_desc)
 
-        session = self._sessions[session_id]
-        session["messages"].append({"role": "user", "content": request.message})
+        result = await self._graph.ainvoke(inputs, config=config)
 
-        # Placeholder — agent logic replaces this in the next phase
-        response_text = (
-            "Welcome to DEUS Bank! I'm here to help you. "
-            "Could you please provide your name and at least one of: "
-            "your phone number or IBAN so I can verify your identity?"
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.info("→ reply in %dms", round(elapsed_ms))
+
+        return ChatResponse(
+            response=result.get("output_text", ""),
+            session_id=session_id,
         )
-
-        session["messages"].append({"role": "assistant", "content": response_text})
-
-        return ChatResponse(response=response_text, session_id=session_id)
