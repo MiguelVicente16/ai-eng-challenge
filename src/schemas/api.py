@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
 
     message: str
     session_id: str | None = None
+    caller_phone: str | None = None
 
 
 class ChatResponse(BaseModel):
