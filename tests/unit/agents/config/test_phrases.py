@@ -85,3 +85,17 @@ def test_render_should_work_without_variables_when_phrase_has_none():
 
     # Assert
     assert "DEUS Bank" in actual
+
+
+def test_phrases_should_contain_specialist_clarify_with_clarification_placeholder():
+    from src.agents.config.phrases import render
+
+    # Arrange + Act
+    rendered = render(
+        "specialist_clarify",
+        {"clarification": "Are you asking about a loan or a credit card?"},
+    )
+
+    # Assert
+    assert "right team" in rendered
+    assert "Are you asking about a loan or a credit card?" in rendered

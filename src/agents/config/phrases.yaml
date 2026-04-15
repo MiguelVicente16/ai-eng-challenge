@@ -65,6 +65,9 @@ guardrails_fallback: >-
   Thank you for contacting DEUS Bank. For assistance, please call our
   support line at {dept_phone}.
 
+specialist_clarify: >-
+  I want to make sure I route you to the right team. {clarification}
+
 session_ended: >-
   This call has ended. Please start a new conversation if you need
   further assistance. Thank you for choosing DEUS Bank.
