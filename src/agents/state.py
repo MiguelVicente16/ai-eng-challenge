@@ -42,6 +42,10 @@ class AgentState(TypedDict, total=False):
     tier: Tier | None
     matched_service: Service | None
 
+    # Clarify loop (Specialist ambiguous-intent branch)
+    clarification_question: str | None
+    clarify_retry_count: int
+
     # Response assembly
     response_phrase_key: str | None
     response_variables: dict[str, str]

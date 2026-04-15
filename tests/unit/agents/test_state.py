@@ -77,3 +77,14 @@ def test_agent_state_should_store_retry_count_when_set():
 
     # Assert
     assert actual["retry_count"] == 2
+
+
+def test_agent_state_should_accept_clarification_question_field():
+    from src.agents.state import AgentState
+
+    # Act
+    state: AgentState = {"clarification_question": "loan or card?", "clarify_retry_count": 1}
+
+    # Assert
+    assert state["clarification_question"] == "loan or card?"
+    assert state["clarify_retry_count"] == 1

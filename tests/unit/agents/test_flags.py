@@ -12,6 +12,7 @@ def test_stage_should_include_all_expected_stages_when_imported():
         "ask_secret",
         "verifying_secret",
         "routing",
+        "clarifying",
         "completed",
         "failed",
     }
@@ -41,3 +42,15 @@ def test_service_should_include_five_values_when_imported():
 
     # Assert
     assert actual == {"investments", "insurance", "loans", "cards", "general"}
+
+
+def test_stage_should_include_clarifying():
+    from typing import get_args
+
+    from src.agents.flags import Stage
+
+    # Act
+    stages = get_args(Stage)
+
+    # Assert
+    assert "clarifying" in stages

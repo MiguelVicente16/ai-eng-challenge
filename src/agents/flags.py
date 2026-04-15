@@ -9,6 +9,7 @@ Stage = Literal[
     "ask_secret",
     "verifying_secret",
     "routing",
+    "clarifying",
     "completed",
     "failed",
 ]
