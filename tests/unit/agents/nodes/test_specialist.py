@@ -180,3 +180,132 @@ async def test_specialist_node_should_route_to_general_when_decision_is_none():
     # Assert
     assert actual["matched_service"] == "general"
     assert actual["response_phrase_key"] == "regular_response"
+
+
+@pytest.mark.asyncio
+async def test_specialist_node_should_emit_clarify_phrase_when_decision_is_clarify():
+    import asyncio
+
+    from src.agents.intent_cache import start_classification
+    from src.agents.nodes.specialist import specialist_node
+    from src.agents.results import ServiceClassification
+
+    # Arrange
+    async def _cached() -> ServiceClassification:
+        return ServiceClassification(
+            decision="clarify",
+            clarification="Are you asking about a new loan or a credit card?",
+            reasoning="ambiguous",
+        )
+
+    start_classification("t-clar", asyncio.create_task(_cached()))
+
+    state = {
+        "tier": "regular",
+        "extracted_name": "Marco",
+        "user_problem": "I need some credit",
+    }
+    config = {"configurable": {"thread_id": "t-clar"}}
+
+    # Act
+    actual = await specialist_node(state, config)
+
+    # Assert
+    assert actual["stage"] == "clarifying"
+    assert actual["response_phrase_key"] == "specialist_clarify"
+    assert actual["response_variables"]["clarification"] == "Are you asking about a new loan or a credit card?"
+    assert actual["clarification_question"] == "Are you asking about a new loan or a credit card?"
+    assert actual["clarify_retry_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_specialist_node_should_combine_problem_and_answer_when_revisiting_from_clarifying(
+    mock_llm,
+):
+    from src.agents.nodes.specialist import specialist_node
+    from src.agents.results import ServiceClassification
+
+    # Arrange — user answered the clarify question; LLM now picks "cards"
+    mock_llm.ainvoke.return_value = ServiceClassification(
+        decision="route",
+        service="cards",
+        reasoning="credit card",
+    )
+
+    state = {
+        "tier": "regular",
+        "extracted_name": "Marco",
+        "stage": "clarifying",
+        "user_problem": "I need some credit",
+        "user_message": "I want a new credit card",
+        "clarification_question": "Are you asking about a loan or a credit card?",
+        "clarify_retry_count": 1,
+    }
+    config = {"configurable": {"thread_id": "t-clar2"}}
+
+    # Act
+    actual = await specialist_node(state, config)
+
+    # Assert — combined problem sent to LLM
+    human_content = mock_llm.ainvoke.await_args[0][0][1][1]
+    assert "I need some credit" in human_content
+    assert "I want a new credit card" in human_content
+    assert actual["matched_service"] == "cards"
+    assert actual["stage"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_specialist_node_should_force_general_when_clarify_retry_budget_exhausted(mock_llm):
+    from src.agents.nodes.specialist import specialist_node
+    from src.agents.results import ServiceClassification
+
+    # Arrange — second clarify in a row, forces fallback to general
+    mock_llm.ainvoke.return_value = ServiceClassification(
+        decision="clarify",
+        clarification="Is this about cards or loans?",
+        reasoning="still ambiguous",
+    )
+
+    state = {
+        "tier": "regular",
+        "extracted_name": "Marco",
+        "stage": "clarifying",
+        "user_problem": "I need some credit",
+        "user_message": "something with a card I think",
+        "clarification_question": "loan or card?",
+        "clarify_retry_count": 1,
+    }
+    config = {"configurable": {"thread_id": "t-clar3"}}
+
+    # Act
+    actual = await specialist_node(state, config)
+
+    # Assert — retry budget exhausted → route to general
+    assert actual["matched_service"] == "general"
+    assert actual["stage"] == "completed"
+    assert actual["response_phrase_key"] == "regular_response"
+
+
+@pytest.mark.asyncio
+async def test_specialist_node_should_fall_back_to_general_when_clarify_has_no_clarification_text():
+    import asyncio
+
+    from src.agents.intent_cache import start_classification
+    from src.agents.nodes.specialist import specialist_node
+    from src.agents.results import ServiceClassification
+
+    # Arrange — LLM returned decision=clarify but no clarification text (defensive)
+    async def _cached() -> ServiceClassification:
+        return ServiceClassification(decision="clarify", clarification=None, reasoning="bad llm")
+
+    start_classification("t-clar4", asyncio.create_task(_cached()))
+
+    state = {"tier": "premium", "extracted_name": "Lisa", "user_problem": "help"}
+    config = {"configurable": {"thread_id": "t-clar4"}}
+
+    # Act
+    actual = await specialist_node(state, config)
+
+    # Assert — treat as 'none' → general
+    assert actual["matched_service"] == "general"
+    assert actual["stage"] == "completed"
