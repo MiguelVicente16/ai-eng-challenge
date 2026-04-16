@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from src.logging_config import setup_logging
 from src.routers.chat import router as chat_router
+from src.routers.voice import router as voice_router
 
 setup_logging()
 
@@ -14,6 +15,7 @@ app = FastAPI(
 )
 
 app.include_router(chat_router)
+app.include_router(voice_router)
 
 
 @app.get("/health")

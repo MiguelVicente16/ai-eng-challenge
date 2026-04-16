@@ -1,4 +1,4 @@
-.PHONY: install lint format format-check test check run simulate simulate-all simulate-interactive draw-graph docker-build docker-up
+.PHONY: install lint format format-check test check run simulate simulate-all simulate-interactive simulate-voice simulate-call-live simulate-call-ptt draw-graph docker-build docker-up
 
 install:
 	uv sync --all-extras
@@ -28,6 +28,15 @@ simulate-all:
 
 simulate-interactive:
 	uv run python scripts/simulate_call.py --interactive
+
+simulate-voice:
+	uv run python scripts/simulate_voice.py $(AUDIO)
+
+simulate-call-live:
+	uv run python scripts/simulate_call_live.py
+
+simulate-call-ptt:
+	PYTHONPATH=. uv run python scripts/simulate_call_ptt.py $(if $(CALLER_PHONE),--caller-phone $(CALLER_PHONE))
 
 draw-graph:
 	PYTHONPATH=. uv run python scripts/draw_graph.py

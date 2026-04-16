@@ -51,3 +51,43 @@ def test_chat_request_should_default_caller_phone_to_none_when_omitted():
 
     # Assert
     assert actual.caller_phone is None
+
+
+def test_chat_request_should_accept_audio_base64_field():
+    from src.schemas.api import ChatRequest
+
+    # Act
+    actual = ChatRequest(message="", audio_base64="YWJjZA==")
+
+    # Assert
+    assert actual.audio_base64 == "YWJjZA=="
+
+
+def test_chat_response_should_accept_optional_audio_base64_field():
+    from src.schemas.api import ChatResponse
+
+    # Act
+    actual = ChatResponse(response="Hello", session_id="s1", audio_base64="YWJjZA==")
+
+    # Assert
+    assert actual.audio_base64 == "YWJjZA=="
+
+
+def test_chat_response_should_default_audio_base64_to_none():
+    from src.schemas.api import ChatResponse
+
+    # Act
+    actual = ChatResponse(response="Hello", session_id="s1")
+
+    # Assert
+    assert actual.audio_base64 is None
+
+
+def test_chat_request_should_default_message_to_empty_string():
+    from src.schemas.api import ChatRequest
+
+    # Act — client sending only audio
+    actual = ChatRequest(audio_base64="YWJjZA==")
+
+    # Assert
+    assert actual.message == ""

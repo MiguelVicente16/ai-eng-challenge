@@ -36,26 +36,35 @@ class SecretAnswer(BaseModel):
 class ServiceClassification(BaseModel):
     """Decision and classification for routing a customer's request.
 
-    `decision` is a categorical flag driving specialist behavior, replacing
-    the earlier numeric confidence field (LLMs don't calibrate floats well —
-    asking for an enum gives stronger, more actionable signal):
+    `decision` is a categorical flag driving specialist behavior:
 
-    - ``route``   — confident match to a service (``service`` required)
+    - ``route``    — confident match to a service (``service`` required)
+    - ``clarify``  — plausible match to 2+ services; ask one follow-up question
     - ``escalate`` — user explicitly asked for a human operator
-    - ``none``    — request is off-topic or doesn't match any service
+    - ``none``     — request is off-topic or doesn't match any service
     """
 
-    decision: Literal["route", "escalate", "none"] = Field(
+    decision: Literal["route", "clarify", "escalate", "none"] = Field(
         description=(
             "How to handle this request. "
             "'route' = confident match to a specific service; "
+            "'clarify' = ambiguous between 2+ services, ask one follow-up question; "
             "'escalate' = user asked for a human operator; "
             "'none' = off-topic or unclear."
         ),
     )
     service: Service | None = Field(
         default=None,
-        description=("Which service to route to. Required when decision='route', otherwise omit."),
+        description="Which service to route to. Required when decision='route', otherwise omit.",
+    )
+    clarification: str | None = Field(
+        default=None,
+        description=(
+            "One short follow-up question (max 120 chars) that disambiguates the request. "
+            "Required when decision='clarify', otherwise omit. Must be a single direct "
+            "question, no preamble, no greeting."
+        ),
+        max_length=120,
     )
     reasoning: str = Field(
         description="Short reason for the decision, max 10 words.",

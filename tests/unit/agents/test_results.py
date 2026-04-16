@@ -86,7 +86,7 @@ def test_service_classification_should_accept_non_route_decision_without_service
     assert actual.service is None
 
 
-@pytest.mark.parametrize("bad_decision", ["maybe", "", "unclear", "clarify"])
+@pytest.mark.parametrize("bad_decision", ["maybe", "", "unclear"])
 def test_service_classification_should_raise_when_decision_not_in_literal(bad_decision):
     from pydantic import ValidationError
 
@@ -108,3 +108,47 @@ def test_service_classification_should_raise_when_reasoning_exceeds_max_length()
     # Act / Assert
     with pytest.raises(ValidationError):
         ServiceClassification(decision="none", reasoning=too_long)
+
+
+def test_service_classification_should_accept_clarify_decision_with_clarification_text():
+    from src.agents.results import ServiceClassification
+
+    # Arrange + Act
+    actual = ServiceClassification(
+        decision="clarify",
+        clarification="Are you asking about a new loan or a credit card?",
+        reasoning="ambiguous between loans and cards",
+    )
+
+    # Assert
+    assert actual.decision == "clarify"
+    assert actual.clarification == "Are you asking about a new loan or a credit card?"
+    assert actual.service is None
+
+
+def test_service_classification_should_reject_clarification_longer_than_120_chars():
+    import pytest
+    from pydantic import ValidationError
+
+    from src.agents.results import ServiceClassification
+
+    # Arrange
+    long_text = "x" * 121
+
+    # Act + Assert
+    with pytest.raises(ValidationError):
+        ServiceClassification(
+            decision="clarify",
+            clarification=long_text,
+            reasoning="too long",
+        )
+
+
+def test_service_classification_should_default_clarification_to_none_when_not_clarify():
+    from src.agents.results import ServiceClassification
+
+    # Act
+    actual = ServiceClassification(decision="route", service="cards", reasoning="card fraud")
+
+    # Assert
+    assert actual.clarification is None
