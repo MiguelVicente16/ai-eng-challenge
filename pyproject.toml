@@ -13,6 +13,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0",
     "langgraph-checkpoint-mongodb>=0.1.0",
+    "deepgram-sdk>=3.7.0",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +23,9 @@ dev = [
     "pytest-mock>=3.12",
     "httpx>=0.28.0",
     "ruff>=0.11.0",
+    "websockets>=13.0",
+    "sounddevice>=0.4.6",
+    "numpy>=1.26",
 ]
 
 [tool.pytest.ini_options]
