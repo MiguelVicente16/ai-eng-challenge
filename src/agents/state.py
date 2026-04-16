@@ -8,9 +8,18 @@ from src.agents.flags import Service, Stage, Tier
 class AgentState(TypedDict, total=False):
     """State shared across all agent nodes. All fields are optional."""
 
-    # Input/output text (wrapped by stt/tts placeholder nodes)
+    # Input/output text (wrapped by stt/tts nodes)
     input_text: str
     output_text: str
+
+    # Raw audio bytes, only populated when the /chat or /voice caller sends audio.
+    input_audio: bytes | None
+    output_audio: bytes | None
+
+    # Optional TTS output format override (threaded from ChatRequest).
+    # When unset, the tts_node uses its default (mp3).
+    tts_encoding: str | None
+    tts_sample_rate: int | None
 
     # Current user turn
     user_message: str
