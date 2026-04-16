@@ -218,6 +218,64 @@ The guardrails story is thus "most of the defense is architectural, not
 runtime" — and the runtime piece we DO have is deliberate, deterministic,
 and safe-by-default.
 
+## Clarify decision branch
+
+The Specialist supports four decisions: ``route``, ``clarify``, ``escalate``,
+``none``. When the LLM judges a request as plausibly matching two or more
+services (e.g. "I need some credit" — loan? card?), it returns
+``decision="clarify"`` with a single ``clarification`` question under 120
+characters. The graph then:
+
+1. Sets ``stage=clarifying`` and emits the ``specialist_clarify`` phrase,
+   wrapping the LLM-written question in a bank-approved template: *"I want
+   to make sure I route you to the right team. {clarification}"*.
+2. The next user message routes back to the Specialist via the stage
+   router, bypassing opener/greeter/bouncer.
+3. The Specialist combines the original problem with the customer's answer
+   (`{original_problem}. Follow-up answer: {answer}`) and re-classifies.
+4. A second ``clarify`` in a row is capped — the loop forces a fallback to
+   ``general`` to prevent infinite clarification chains. One retry only.
+
+**Why this is safe.** The only LLM-authored text that reaches the user is
+the single ``clarification`` question, and it passes through the same
+`guardrails_node` leak scan as every other reply. The surrounding framing,
+tone, and structure all come from pre-approved YAML — Layer 1 of the
+security model is intact. The 120-character cap prevents the LLM from
+slipping a paragraph-length injection attempt through the narrow opening.
+
+## Voice interface — Deepgram STT and TTS
+
+The STT/TTS nodes are no longer placeholders. Both endpoints — `/chat` and
+`/voice` — route audio through Deepgram:
+
+- **Batch mode (`/chat`)**: the `audio_base64` field accepts any format
+  Deepgram supports. The `stt_node` calls Nova via the prerecorded API and
+  writes the transcript to `user_message`; the `tts_node` calls Aura on
+  `output_text` and returns the MP3 bytes under a new `audio_base64`
+  response field. Text-only requests still work exactly as before — when
+  `audio_base64` is absent, both nodes pass through.
+- **Streaming mode (`/voice`)**: a new WebSocket endpoint accepts raw
+  linear16 16 kHz mono PCM frames. They're forwarded to a Deepgram Flux
+  (`listen.v2`) connection, which groups them into turns and emits an
+  `EndOfTurn` event on natural pauses (controlled by `eot_threshold` and
+  `eot_timeout_ms`). Each turn becomes one `ChatService.handle_message`
+  call — exactly the same entry point as `/chat`, with the same graph,
+  checkpointer, and thread_id semantics. The reply is streamed back as a
+  JSON text frame plus an Aura-encoded MP3 binary frame.
+
+**Why Deepgram Flux specifically.** Flux is purpose-built for phone-call
+voice agents: it does end-of-turn detection server-side so the client
+doesn't need to implement voice activity detection. One incoming turn = one
+outbound graph invocation — the natural unit for our stage router. It also
+gives us a single provider for both STT and TTS, so the setup story is one
+env var (`DEEPGRAM_API_KEY`) and one SDK.
+
+**Opt-in, like MongoDB.** `DEEPGRAM_API_KEY` is optional. When unset:
+`/chat` ignores `audio_base64` and the existing flow is unchanged; `/voice`
+accepts the WebSocket and immediately closes it with code 1011 and a
+"Deepgram not configured" reason. This keeps `make run` zero-setup for
+reviewers who only care about the text flow.
+
 ## Known limitations
 
 ### `intent_cache` is process-local
@@ -247,18 +305,26 @@ When the app runs without `MONGODB_URL`, in-progress conversations die
 on reload. This is the default mode for `make run` and for tests.
 Production deployments should always set `MONGODB_URL`.
 
-### STT/TTS are placeholder pass-through nodes
+### Voice limitations
 
-The graph includes `stt` and `tts` nodes that are currently no-ops. They
-exist to keep the graph shape stable when real speech-to-text /
-text-to-speech integration (e.g., Gemini Live) is wired in later.
+- **Batch mode adds ~1s round-trip**. `/chat` with `audio_base64` waits
+  for one full Nova transcription and one full Aura synthesis before
+  replying. This is fine for phone IVR tests but slower than real
+  streaming. `/voice` exists precisely to avoid that cost.
+- **`/voice` is single-turn streaming with batch TTS**. Flux handles the
+  inbound streaming. The outbound reply is synthesized in one Aura batch
+  call per turn rather than streamed chunk-by-chunk — good enough for
+  short phrases but noticeable on long premium responses. Streaming Aura
+  output is straightforward but out of scope.
+- **No voice activity fallback**. If Deepgram Flux drops the connection
+  mid-call, we close the WebSocket with 1011; reconnection is the
+  client's responsibility. A production deployment would retry with
+  backoff and a fresh `thread_id` continuation.
 
 ## Future work
 
 - Move `intent_cache` to Redis or MongoDB for multi-pod deployments.
 - Wire up LangSmith tracing (one env var enables per-node traces).
-- Add a real STT/TTS integration for a voice interface (Gemini Live,
-  OpenAI Realtime, or equivalent).
 - Expose YAML configs (phrases, routing rules) via an admin API for
   frontend-based editing.
 - Add a dedicated content moderation API call (Google Content Safety /
@@ -267,49 +333,3 @@ text-to-speech integration (e.g., Gemini Live) is wired in later.
   classifier call. Only needed if abusive input / prompt injection
   logging becomes a concrete requirement.
 
-### Clarification decision branch (smart fallback instead of default-to-general)
-
-The Specialist currently supports three decisions: ``route``, ``escalate``,
-``none``. A natural extension is a fourth decision — ``clarify`` — for the
-case where a user's request could plausibly fit two or more services and
-the LLM needs to ask a disambiguating question (e.g., "Are you asking
-about a new loan or a credit card?"). Today such cases fall into ``none``
-and default to general support, which is functionally correct but wastes
-the opportunity to route the user precisely with a single follow-up turn.
-
-**Proposed shape:**
-
-```python
-class ServiceClassification(BaseModel):
-    decision: Literal["route", "clarify", "escalate", "none"]
-    service: Service | None = None
-    clarification: str | None = Field(default=None, max_length=80)
-    reasoning: str = Field(max_length=100)
-```
-
-**Hybrid phrase pattern to stay safe:** rather than letting the LLM
-generate the entire clarification turn (which would break our "no
-LLM-generated user-visible text" invariant), wrap the LLM's question in a
-bank-approved template:
-
-```yaml
-specialist_clarify: >-
-  I want to make sure I route you to the right team. {clarification}
-```
-
-The tone, structure, and framing are pre-approved YAML; only the
-specific one-sentence question is LLM-filled, under strict length and
-category constraints. The final rendered text still passes through
-`guardrails_node` for the leak scan.
-
-**Graph changes:** add a `clarifying` stage. When the Specialist returns
-``decision="clarify"``, emit `specialist_clarify` and set
-``stage=clarifying``. The next user message routes back to the Specialist
-with the combined problem + clarification in ``user_problem``. Cap the
-clarify loop at one retry — a second ``clarify`` on the same session
-forces ``none`` to prevent infinite clarification loops.
-
-**When to ship this:** when UX polish becomes a priority over shipping.
-The ``decision`` enum is already in place (replacing the old numeric
-``confidence`` float) specifically so this extension is a localized
-change rather than a schema migration.
