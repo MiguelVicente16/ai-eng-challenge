@@ -1,0 +1,31 @@
+# Post-call summary metrics. Each entry becomes a field on the dynamically-
+# built ConversationSummary pydantic model, AND appears in the LLM system
+# prompt. A future admin UI can edit this file to add/remove/tune metrics
+# with no code changes.
+#
+# Supported types: string, enum, list, boolean, integer, number.
+metrics:
+  - name: summary
+    type: string
+    max_length: 500
+    description: >-
+      Two or three sentences summarizing what the customer wanted and how
+      the call ended.
+
+  - name: sentiment
+    type: enum
+    values: [positive, neutral, negative]
+    description: Overall customer sentiment during the call.
+
+  - name: topics
+    type: list
+    item_type: string
+    max_items: 5
+    description: >-
+      One to three short topic tags (e.g. "yacht insurance", "card fraud").
+
+  - name: resolved
+    type: boolean
+    description: >-
+      True if the customer was successfully routed to the right team,
+      false if the call ended in fallback or failure.
