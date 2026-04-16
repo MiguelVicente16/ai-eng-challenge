@@ -181,3 +181,94 @@ async def test_graph_should_emit_session_ended_phrase_on_new_turn_after_completi
 
     # Assert
     assert "This call has ended" in actual["output_text"]
+
+
+@pytest.mark.asyncio
+async def test_graph_should_route_clarifying_stage_directly_to_specialist(mocker):
+    from src.agents.graph import build_graph
+    from src.agents.intent_cache import clear
+    from src.agents.results import ServiceClassification
+
+    # Arrange — force a route on the second classification
+    clear()
+    build_graph.cache_clear()
+
+    classify = mocker.AsyncMock(
+        return_value=ServiceClassification(decision="route", service="cards", reasoning="credit card")
+    )
+    mocker.patch("src.agents.nodes.specialist.classify_service", classify)
+
+    graph = build_graph()
+    config = {"configurable": {"thread_id": "t-clar-graph"}}
+    await graph.aupdate_state(
+        config,
+        {
+            "stage": "clarifying",
+            "tier": "regular",
+            "extracted_name": "Marco",
+            "user_problem": "I need some credit",
+            "clarification_question": "loan or card?",
+            "clarify_retry_count": 1,
+        },
+    )
+
+    # Act
+    result = await graph.ainvoke({"input_text": "I want a new credit card"}, config=config)
+
+    # Assert
+    assert result["matched_service"] == "cards"
+    assert result["stage"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_graph_should_ask_clarify_and_route_on_answer(mocker):
+    from src.agents.graph import build_graph
+    from src.agents.intent_cache import clear
+    from src.agents.results import ServiceClassification
+
+    # Arrange — two classify calls: first clarifies, second routes
+    clear()
+    build_graph.cache_clear()
+
+    classify = mocker.AsyncMock(
+        side_effect=[
+            ServiceClassification(
+                decision="clarify",
+                clarification="Are you asking about a loan or a credit card?",
+                reasoning="ambiguous",
+            ),
+            ServiceClassification(decision="route", service="cards", reasoning="card"),
+        ]
+    )
+    mocker.patch("src.agents.nodes.specialist.classify_service", classify)
+    mocker.patch("src.agents.nodes.capture_problem.classify_service", classify)
+
+    graph = build_graph()
+    config = {"configurable": {"thread_id": "t-clar-e2e"}}
+
+    # Seed a verified premium session directly at the routing stage
+    await graph.aupdate_state(
+        config,
+        {
+            "stage": "routing",
+            "tier": "premium",
+            "verified_iban": "DE89370400440532013000",
+            "extracted_name": "Lisa",
+            "user_problem": "I need some credit",
+            "clarify_retry_count": 0,
+        },
+    )
+
+    # Act — turn A: specialist emits clarify
+    turn_a = await graph.ainvoke({"input_text": ""}, config=config)
+
+    # Assert — turn A
+    assert turn_a["response_phrase_key"] == "specialist_clarify"
+    assert "loan or a credit card" in turn_a["output_text"]
+
+    # Act — turn B: user answers, specialist routes to cards
+    turn_b = await graph.ainvoke({"input_text": "I want a new credit card"}, config=config)
+
+    # Assert — turn B
+    assert turn_b["matched_service"] == "cards"
+    assert turn_b["stage"] == "completed"

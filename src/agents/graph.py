@@ -33,6 +33,8 @@ def _route_by_stage(state: AgentState) -> str:
         return "verifier"
     if stage == "routing":
         return "bouncer"
+    if stage == "clarifying":
+        return "specialist"
     if stage in ("completed", "failed"):
         return "session_ended"
     return "responder"
@@ -73,6 +75,7 @@ def build_graph():
             "greeter": "greeter",
             "verifier": "verifier",
             "bouncer": "bouncer",
+            "specialist": "specialist",
             "session_ended": "session_ended",
             "responder": "responder",
         },
