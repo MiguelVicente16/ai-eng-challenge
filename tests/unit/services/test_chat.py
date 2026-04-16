@@ -126,3 +126,71 @@ async def test_handle_message_should_not_override_state_on_existing_session(mock
     assert "stage" not in inputs
     assert "caller_phone" not in inputs
     assert inputs["input_text"] == "Yoda"
+
+
+@pytest.mark.asyncio
+async def test_handle_message_should_pass_decoded_audio_bytes_to_graph(mock_graph):
+    import base64
+
+    from src.schemas.api import ChatRequest
+    from src.services.chat import ChatService
+
+    # Arrange
+    service = ChatService()
+    encoded = base64.b64encode(b"raw-audio").decode("ascii")
+
+    # Act
+    await service.handle_message(ChatRequest(message="", audio_base64=encoded))
+
+    # Assert — graph received decoded bytes under input_audio
+    inputs = mock_graph.ainvoke.await_args[0][0]
+    assert inputs["input_audio"] == b"raw-audio"
+
+
+@pytest.mark.asyncio
+async def test_handle_message_should_encode_output_audio_as_base64_in_response(mock_graph, mocker):
+    import base64
+
+    from src.schemas.api import ChatRequest
+    from src.services.chat import ChatService
+
+    # Arrange — graph returns output_audio bytes
+    mock_graph.ainvoke = mocker.AsyncMock(return_value={"output_text": "Hello", "output_audio": b"mp3-bytes"})
+    service = ChatService()
+
+    # Act
+    actual = await service.handle_message(ChatRequest(message="Hi"))
+
+    # Assert
+    assert actual.audio_base64 == base64.b64encode(b"mp3-bytes").decode("ascii")
+
+
+@pytest.mark.asyncio
+async def test_handle_message_should_return_none_audio_when_graph_produces_no_audio(mock_graph):
+    from src.schemas.api import ChatRequest
+    from src.services.chat import ChatService
+
+    # Arrange — default mock_graph returns only output_text
+    service = ChatService()
+
+    # Act
+    actual = await service.handle_message(ChatRequest(message="Hi"))
+
+    # Assert
+    assert actual.audio_base64 is None
+
+
+@pytest.mark.asyncio
+async def test_handle_message_should_raise_http_400_when_audio_base64_invalid(mock_graph):
+    from fastapi import HTTPException
+
+    from src.schemas.api import ChatRequest
+    from src.services.chat import ChatService
+
+    # Arrange
+    service = ChatService()
+
+    # Act + Assert
+    with pytest.raises(HTTPException) as exc_info:
+        await service.handle_message(ChatRequest(message="", audio_base64="***bad***"))
+    assert exc_info.value.status_code == 400

@@ -64,3 +64,35 @@ def test_chat_should_preserve_session_id_when_provided(client):
     # Assert
     assert actual.status_code == 200
     assert actual.json()["session_id"] == "existing-session"
+
+
+def test_chat_endpoint_should_return_audio_base64_when_graph_produces_audio(mocker):
+    import base64
+
+    from fastapi.testclient import TestClient
+
+    from src.main import app
+    from src.routers.chat import get_chat_service
+    from src.services.chat import ChatService
+
+    # Arrange
+    graph = mocker.AsyncMock()
+    graph.ainvoke = mocker.AsyncMock(return_value={"output_text": "Welcome", "output_audio": b"mp3-bytes"})
+    snapshot = mocker.MagicMock()
+    snapshot.values = {}
+    graph.aget_state = mocker.AsyncMock(return_value=snapshot)
+    mocker.patch("src.services.chat.build_graph", return_value=graph)
+
+    service = ChatService()
+    app.dependency_overrides[get_chat_service] = lambda: service
+
+    try:
+        client = TestClient(app)
+        response = client.post("/chat", json={"message": "hi"})
+    finally:
+        app.dependency_overrides.clear()
+
+    # Assert
+    assert response.status_code == 200
+    body = response.json()
+    assert body["audio_base64"] == base64.b64encode(b"mp3-bytes").decode("ascii")
