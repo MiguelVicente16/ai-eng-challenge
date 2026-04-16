@@ -272,3 +272,125 @@ async def test_graph_should_ask_clarify_and_route_on_answer(mocker):
     # Assert — turn B
     assert turn_b["matched_service"] == "cards"
     assert turn_b["stage"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_graph_should_fire_summarizer_on_terminal_turn(mocker):
+    import asyncio as _asyncio
+
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from src.agents.graph import build_graph
+    from src.agents.intent_cache import clear
+    from src.agents.results import ServiceClassification
+    from src.agents.summary import summarizer as svc
+
+    # Arrange — the call reaches routing via a full verified flow.
+    # Force InMemorySaver so the test is isolated from any real MongoDB
+    # the developer may have configured in .env.
+    clear()
+    mocker.patch("src.agents.graph.get_checkpointer", return_value=InMemorySaver())
+    build_graph.cache_clear()
+
+    mocker.patch(
+        "src.agents.nodes.specialist.classify_service",
+        mocker.AsyncMock(return_value=ServiceClassification(decision="route", service="insurance", reasoning="yacht")),
+    )
+    mocker.patch(
+        "src.agents.nodes.capture_problem.classify_service",
+        mocker.AsyncMock(return_value=ServiceClassification(decision="route", service="insurance", reasoning="yacht")),
+    )
+    run_mock = mocker.patch.object(svc, "run_summarization", mocker.AsyncMock())
+
+    graph = build_graph()
+    config = {"configurable": {"thread_id": "t-summary"}}
+
+    # Seed a verified premium session at the routing stage
+    await graph.aupdate_state(
+        config,
+        {
+            "stage": "routing",
+            "tier": "premium",
+            "extracted_name": "Lisa",
+            "verified_iban": "DE89370400440532013000",
+            "user_problem": "I need help with my yacht insurance",
+        },
+    )
+
+    # Act — specialist completes the routing, stage becomes completed
+    await graph.ainvoke({"input_text": ""}, config=config)
+    await _asyncio.sleep(0)
+
+    # Assert — the summarizer ran exactly once
+    run_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_graph_should_not_fire_summarizer_on_non_terminal_turn(mocker):
+    import asyncio as _asyncio
+
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from src.agents.graph import build_graph
+    from src.agents.intent_cache import clear
+    from src.agents.summary import summarizer as svc
+
+    # Arrange — force InMemorySaver to isolate from configured MongoDB
+    clear()
+    mocker.patch("src.agents.graph.get_checkpointer", return_value=InMemorySaver())
+    build_graph.cache_clear()
+
+    run_mock = mocker.patch.object(svc, "run_summarization", mocker.AsyncMock())
+
+    graph = build_graph()
+    config = {"configurable": {"thread_id": "t-nosummary"}}
+
+    # Act — brand new session runs opener, stays non-terminal
+    await graph.ainvoke({"input_text": "Hi", "stage": "new_session"}, config=config)
+    await _asyncio.sleep(0)
+
+    # Assert
+    run_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_graph_should_fire_summarizer_only_once_across_followup_turns(mocker):
+    import asyncio as _asyncio
+
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from src.agents.graph import build_graph
+    from src.agents.intent_cache import clear
+    from src.agents.summary import summarizer as svc
+
+    # Arrange — force InMemorySaver to isolate from configured MongoDB
+    clear()
+    mocker.patch("src.agents.graph.get_checkpointer", return_value=InMemorySaver())
+    build_graph.cache_clear()
+
+    run_mock = mocker.patch.object(svc, "run_summarization", mocker.AsyncMock())
+
+    graph = build_graph()
+    config = {"configurable": {"thread_id": "t-once"}}
+
+    # Seed the session as already completed with summary_fired=False
+    await graph.aupdate_state(
+        config,
+        {
+            "stage": "completed",
+            "tier": "premium",
+            "extracted_name": "Lisa",
+            "matched_service": "insurance",
+            "user_problem": "yacht",
+            "summary_fired": False,
+        },
+    )
+
+    # Act — first follow-up turn fires summarizer; second does not
+    await graph.ainvoke({"input_text": "hello?"}, config=config)
+    await _asyncio.sleep(0)
+    await graph.ainvoke({"input_text": "still there?"}, config=config)
+    await _asyncio.sleep(0)
+
+    # Assert
+    assert run_mock.await_count == 1

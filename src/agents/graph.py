@@ -14,6 +14,7 @@ from src.agents.nodes.responder import responder_node
 from src.agents.nodes.session_ended import session_ended_node
 from src.agents.nodes.specialist import specialist_node
 from src.agents.nodes.stt import stt_node
+from src.agents.nodes.summarizer import summarizer_node
 from src.agents.nodes.tts import tts_node
 from src.agents.nodes.verifier import verifier_node
 from src.agents.state import AgentState
@@ -47,9 +48,17 @@ def _route_after_verifier(state: AgentState) -> str:
     return "responder"
 
 
+def _route_after_tts(state: AgentState) -> str:
+    """Fire the summarizer once, on the first terminal turn of a call."""
+    stage = state.get("stage")
+    if stage in ("completed", "failed") and not state.get("summary_fired"):
+        return "summarizer"
+    return "end"
+
+
 @lru_cache(maxsize=1)
 def build_graph():
-    """Build and compile the customer support graph with InMemorySaver."""
+    """Build and compile the customer support graph."""
     graph = StateGraph(AgentState)
 
     graph.add_node("stt", stt_node)
@@ -63,6 +72,7 @@ def build_graph():
     graph.add_node("responder", responder_node)
     graph.add_node("guardrails", guardrails_node)
     graph.add_node("tts", tts_node)
+    graph.add_node("summarizer", summarizer_node)
 
     graph.add_edge(START, "stt")
 
@@ -98,6 +108,15 @@ def build_graph():
 
     graph.add_edge("responder", "guardrails")
     graph.add_edge("guardrails", "tts")
-    graph.add_edge("tts", END)
+
+    graph.add_conditional_edges(
+        "tts",
+        _route_after_tts,
+        {
+            "summarizer": "summarizer",
+            "end": END,
+        },
+    )
+    graph.add_edge("summarizer", END)
 
     return graph.compile(checkpointer=get_checkpointer())

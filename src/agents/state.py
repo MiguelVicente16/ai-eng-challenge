@@ -58,3 +58,7 @@ class AgentState(TypedDict, total=False):
     # Response assembly
     response_phrase_key: str | None
     response_variables: dict[str, str]
+
+    # Set True once the post-call summarizer has been fired. Prevents
+    # double-firing on follow-up turns when the stage is already terminal.
+    summary_fired: bool
