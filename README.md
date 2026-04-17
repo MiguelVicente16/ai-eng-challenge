@@ -78,7 +78,7 @@ example_of_account = {
 4.  **💬 Realistic Commits**: A clean Git history with logical, well-described commits.
 5.  **📤 Submission**: Please commit and push your solution directly to this repository.
 
-![Graph example](lang-graph.png?raw=true "Graph example")
+![Agent graph](docs/graph.png?raw=true "Agent graph")
 
 ---
 
@@ -94,3 +94,42 @@ Want to go the extra mile? Consider exploring these optional extensions:
 -   **🐳 Dockerize the Application**: Package the solution into a Docker container for easy deployment and scalability.
 
 Now, go forth and build the most epic AI-powered customer support ever! 🚀
+
+---
+
+## 🚀 How to run this implementation
+
+Requires **Python 3.12+**, [`uv`](https://github.com/astral-sh/uv), and **Node 20+** for the admin UI.
+
+```bash
+# 1. Backend — only GOOGLE_API_KEY is required to start
+make install
+echo "GOOGLE_API_KEY=your-google-ai-studio-key" > .env
+make run                       # FastAPI on http://localhost:8004
+```
+
+```bash
+# 2. Admin UI (in another terminal)
+cd frontend && npm install && npm run dev   # http://localhost:5173
+```
+
+### Optional integrations
+
+| Variable | Unset (default) | Set |
+|---|---|---|
+| `MONGODB_URL` | LangGraph uses in-memory checkpointer; summaries fall back to `data/summaries.jsonl` | LangGraph checkpoints to Mongo; summaries persist to the `summaries` collection |
+| `DEEPGRAM_API_KEY` | `/chat` ignores `audio_base64`; `/voice` accepts the WS then closes with 1011 | Push-to-talk voice + audio in/out on `/chat` |
+
+The system runs end-to-end with **both unset** (text only). With everything wired, `docker compose up --build` brings up Mongo + the backend together.
+
+### Useful commands
+
+```bash
+make test              # backend pytest suite
+make check             # ruff + format + tests
+make simulate          # one canned scripted call against /chat
+make draw-graph        # re-render docs/graph.png
+cd frontend && npm test                    # admin UI vitest
+```
+
+Architecture, state machine, security model and known limitations live in [`docs/architecture.md`](docs/architecture.md).
