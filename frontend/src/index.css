@@ -1,0 +1,203 @@
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Nova-preset data-attribute shortcuts */
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-disabled (&[data-disabled]);
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+/*
+  Palette — Apple-style neutral: near-white surfaces, crisp graphite text,
+  single subtle accent for active / brand moments.
+*/
+@theme {
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar: hsl(var(--sidebar-background));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+
+  --color-brand: hsl(var(--brand));
+  --color-brand-foreground: hsl(var(--brand-foreground));
+  --color-success: hsl(var(--success));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+@layer base {
+  :root {
+    /* near-white surface, graphite text (macOS light-mode vibe) */
+    --background: 0 0% 99%;
+    --foreground: 220 10% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 10% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 10% 12%;
+
+    --primary: 220 10% 12%;
+    --primary-foreground: 0 0% 99%;
+
+    --secondary: 220 12% 96%;
+    --secondary-foreground: 220 10% 12%;
+
+    --muted: 220 12% 96%;
+    --muted-foreground: 220 8% 44%;
+
+    --accent: 220 12% 96%;
+    --accent-foreground: 220 10% 12%;
+
+    --destructive: 2 66% 52%;
+    --destructive-foreground: 0 0% 99%;
+
+    /* Neutral accent — tracks the theme (graphite in light, bone in dark).
+       Keeps hover/active tint feeling native instead of a product-branded
+       color. */
+    --brand: 220 10% 12%;
+    --brand-foreground: 0 0% 99%;
+    --success: 142 52% 40%;
+
+    --border: 220 12% 90%;
+    --input: 220 12% 90%;
+    --ring: 220 10% 12%;
+    --radius: 0.625rem;
+
+    /* sidebar: barely-different tint so it reads as a panel */
+    --sidebar-background: 220 20% 98%;
+    --sidebar-foreground: 220 10% 24%;
+    --sidebar-primary: 220 10% 12%;
+    --sidebar-primary-foreground: 0 0% 99%;
+    --sidebar-accent: 220 12% 92%;
+    --sidebar-accent-foreground: 220 10% 12%;
+    --sidebar-border: 220 12% 90%;
+    --sidebar-ring: 220 10% 12%;
+  }
+  .dark {
+    --background: 220 12% 7%;
+    --foreground: 220 12% 94%;
+    --card: 220 12% 10%;
+    --card-foreground: 220 12% 94%;
+    --popover: 220 12% 10%;
+    --popover-foreground: 220 12% 94%;
+
+    --primary: 220 12% 94%;
+    --primary-foreground: 220 12% 10%;
+    --secondary: 220 10% 16%;
+    --secondary-foreground: 220 12% 94%;
+    --muted: 220 10% 14%;
+    --muted-foreground: 220 8% 62%;
+    --accent: 220 10% 16%;
+    --accent-foreground: 220 12% 94%;
+    --destructive: 2 56% 52%;
+    --destructive-foreground: 220 12% 94%;
+
+    --brand: 220 12% 94%;
+    --brand-foreground: 220 12% 10%;
+    --success: 142 42% 52%;
+
+    --border: 220 10% 18%;
+    --input: 220 10% 18%;
+    --ring: 220 12% 94%;
+
+    --sidebar-background: 220 12% 9%;
+    --sidebar-foreground: 220 12% 82%;
+    --sidebar-primary: 220 12% 94%;
+    --sidebar-primary-foreground: 220 12% 10%;
+    --sidebar-accent: 220 10% 18%;
+    --sidebar-accent-foreground: 220 12% 94%;
+    --sidebar-border: 220 10% 16%;
+    --sidebar-ring: 220 12% 94%;
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border);
+  }
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+}
+
+/* Reactive voice orb — driven by --mic / --tts levels (0..1+) set per frame
+   from the AnalyserNode RMS in VoiceOrb.tsx. Rings each pick their own
+   --scale and --floor so the inner ring barely moves while outer rings
+   swell more dramatically. */
+.voice-orb {
+  --level: max(var(--mic, 0), var(--tts, 0));
+  transform: scale(calc(1 + var(--level) * 0.18));
+  transition: transform 80ms ease-out;
+}
+.voice-orb-glow {
+  transform: scale(calc(1 + var(--level, 0) * 0.5));
+  opacity: calc(0.15 + var(--level, 0) * 0.4);
+  transition: transform 80ms ease-out, opacity 80ms ease-out;
+}
+.voice-ring {
+  --level: max(var(--mic, 0), var(--tts, 0));
+  transform: scale(calc(1 + var(--level) * var(--scale, 0.3)));
+  opacity: calc(var(--floor, 0.2) + var(--level) * 0.6);
+  transition: transform 100ms ease-out, opacity 100ms ease-out;
+}
