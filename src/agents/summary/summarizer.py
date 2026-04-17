@@ -12,7 +12,10 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from langchain_core.messages import AIMessage, HumanMessage
+
 from src.agents.llm import get_llm
+from src.agents.messages import message_text
 from src.agents.state import AgentState
 from src.agents.summary.metrics import build_summary_model, build_summary_prompt
 from src.agents.summary.store import get_summary_store
@@ -78,6 +81,18 @@ def build_record(thread_id: str, state: AgentState, summary: Any) -> dict:
     fallback otherwise produces inconsistent datetime formats).
     """
     phone = state.get("caller_phone")
+
+    transcript: list[dict] = []
+    # `state["messages"]` is produced by LangGraph's message-append reducer.
+    # Not currently populated by any node — tracked as a follow-up so this
+    # transcript will be empty on existing call flows. Safe to leave here;
+    # admin UI handles empty-transcript rendering.
+    for msg in state.get("messages") or []:
+        if isinstance(msg, HumanMessage):
+            transcript.append({"role": "user", "content": message_text(msg)})
+        elif isinstance(msg, AIMessage):
+            transcript.append({"role": "assistant", "content": message_text(msg)})
+
     record: dict = {
         "session_id": thread_id,
         "timestamp": datetime.now(UTC).isoformat(),
@@ -90,6 +105,7 @@ def build_record(thread_id: str, state: AgentState, summary: Any) -> dict:
         "stage": state.get("stage"),
         "caller_phone_masked": mask(phone) if phone else None,
         "user_problem": state.get("user_problem"),
+        "transcript": transcript,
         "metrics": summary.model_dump(mode="json"),
     }
     return record

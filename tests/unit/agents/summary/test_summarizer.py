@@ -332,3 +332,74 @@ async def test_run_summarization_should_swallow_store_errors(mocker, fake_summar
 
     # Assert
     store.save.assert_awaited_once()
+
+
+def test_build_record_should_include_transcript_from_messages(mocker):
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
+    from src.agents.summary.summarizer import build_record
+
+    # Arrange — state with a mix of message types; SystemMessage is skipped
+    state = {
+        "messages": [
+            SystemMessage(content="system prompt"),
+            HumanMessage(content="I need help with my card"),
+            AIMessage(content="Sure, I can help with that."),
+        ],
+        "caller_phone": "+1555123",
+        "stage": "completed",
+    }
+    summary = mocker.MagicMock()
+    summary.model_dump.return_value = {"summary": "done"}
+
+    # Act
+    record = build_record("thread-abc", state, summary)
+
+    # Assert
+    assert record["transcript"] == [
+        {"role": "user", "content": "I need help with my card"},
+        {"role": "assistant", "content": "Sure, I can help with that."},
+    ]
+
+
+def test_build_record_should_return_empty_transcript_when_messages_missing():
+    from src.agents.summary.summarizer import build_record
+
+    # Arrange
+    state = {"caller_phone": None, "stage": "failed"}
+
+    class _Stub:
+        def model_dump(self, mode: str) -> dict:
+            return {}
+
+    # Act
+    record = build_record("thread-xyz", state, _Stub())
+
+    # Assert
+    assert record["transcript"] == []
+
+
+def test_build_record_should_flatten_list_content_messages_to_text():
+    from langchain_core.messages import AIMessage
+
+    from src.agents.summary.summarizer import build_record
+
+    # Arrange — AIMessage with list-of-content-blocks (Anthropic tool-use style)
+    msg = AIMessage(content=[
+        {"type": "text", "text": "Let me check that."},
+        {"type": "tool_use", "id": "x", "name": "lookup", "input": {}},
+        {"type": "text", "text": " One moment."},
+    ])
+    state = {"messages": [msg], "caller_phone": None, "stage": "completed"}
+
+    class _Stub:
+        def model_dump(self, mode: str) -> dict:
+            return {}
+
+    # Act
+    record = build_record("thread-list", state, _Stub())
+
+    # Assert
+    assert record["transcript"] == [
+        {"role": "assistant", "content": "Let me check that. One moment."},
+    ]
