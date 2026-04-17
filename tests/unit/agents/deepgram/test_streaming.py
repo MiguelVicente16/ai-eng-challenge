@@ -22,6 +22,9 @@ async def test_flux_session_should_yield_turn_events_when_deepgram_signals_end_o
         def send_close_stream(self):
             pass
 
+        def start_listening(self):
+            pass
+
     fake_conn = FakeConnection()
 
     class FakeCtx:
@@ -79,6 +82,9 @@ async def test_flux_session_should_emit_interim_event_for_non_eot_messages(mocke
             pass
 
         def send_close_stream(self):
+            pass
+
+        def start_listening(self):
             pass
 
     class FakeCtx:
@@ -147,6 +153,9 @@ async def test_flux_session_send_audio_should_forward_bytes_to_connection(mocker
             sent_frames.append(data)
 
         def send_close_stream(self):
+            pass
+
+        def start_listening(self):
             pass
 
     class FakeCtx:

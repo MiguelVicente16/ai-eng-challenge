@@ -59,25 +59,29 @@ def test_voice_endpoint_should_run_chat_service_on_each_end_of_turn(mocker):
 
     try:
         client = TestClient(app)
+        frames: list[str] = []
         with client.websocket_connect("/voice") as ws:
             ws.send_bytes(b"\x00\x00")  # a fake audio frame
             ws.send_text("__end__")
-            frame = ws.receive_text()
-            # Drain until the server closes
+            # Drain until the server closes. Expect at least two "turn"
+            # frames: the bot opener (empty transcript) and the real turn.
             try:
                 while True:
-                    ws.receive_text()
+                    frames.append(ws.receive_text())
             except Exception:  # noqa: BLE001
                 pass
     finally:
         app.dependency_overrides.clear()
 
     # Assert
-    payload = json.loads(frame)
-    assert payload["type"] == "turn"
-    assert payload["transcript"] == "I need yacht insurance"
-    assert payload["response"] == "Routing you to Insurance"
-    chat_service.handle_message.assert_awaited_once()
+    turn_frames = [json.loads(f) for f in frames if json.loads(f)["type"] == "turn"]
+    transcripts = [p["transcript"] for p in turn_frames]
+    assert "" in transcripts  # opener has empty transcript
+    assert "I need yacht insurance" in transcripts
+    yacht_turn = next(p for p in turn_frames if p["transcript"] == "I need yacht insurance")
+    assert yacht_turn["response"] == "Routing you to Insurance"
+    # Opener + real turn → handle_message called twice.
+    assert chat_service.handle_message.await_count == 2
 
 
 def test_voice_endpoint_should_stream_tts_audio_binary_frame_when_synthesized(mocker):

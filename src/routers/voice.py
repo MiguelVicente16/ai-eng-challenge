@@ -76,6 +76,7 @@ async def voice_endpoint(
 ) -> None:
     """Stream audio from the client through Deepgram Flux into the graph."""
     await websocket.accept()
+    logger.info("/voice ws accepted")
 
     if not _flux_available():
         logger.warning("/voice refused: DEEPGRAM_API_KEY unset")
@@ -85,12 +86,23 @@ async def voice_endpoint(
     session = FluxSession()
     try:
         await session.start()
+        logger.info("/voice flux session started")
     except Exception as exc:  # noqa: BLE001
         logger.warning("Flux start failed: %s", exc)
         await websocket.close(code=1011, reason="Deepgram Flux unavailable")
         return
 
     session_id: str | None = None
+
+    # Kick off the call with the bank opener — same pattern as the PTT
+    # simulator. An empty-transcript turn invokes the graph with no user
+    # message, which triggers the new_session path and emits the opener
+    # phrase. Transcript stays empty so the client can skip rendering a
+    # blank user bubble.
+    try:
+        session_id = await _run_turn("", session_id, chat_service, websocket)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("voice opener failed: %s", exc)
 
     async def pump_events() -> None:
         nonlocal session_id
@@ -119,7 +131,24 @@ async def voice_endpoint(
                 break
     finally:
         await session.close()
-        await events_task
+        # Cap the pump wait — if a turn coroutine is stuck mid-send, we don't
+        # want the WS handler to hang forever (and with it, ctrl-C signal
+        # delivery to the parent uvicorn process).
+        try:
+            await asyncio.wait_for(events_task, timeout=5.0)
+        except asyncio.TimeoutError:
+            logger.warning("voice events_task did not finish — cancelling")
+            events_task.cancel()
+            try:
+                await events_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+        # Best-effort "done" + close. The client may have already
+        # disconnected (tab closed, navigated away); swallow the resulting
+        # WebSocketDisconnect since there's nobody to tell about it anyway.
         if websocket.client_state == WebSocketState.CONNECTED:
-            await websocket.send_text(json.dumps({"type": "done"}))
-            await websocket.close()
+            try:
+                await websocket.send_text(json.dumps({"type": "done"}))
+                await websocket.close()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("voice ws close race: %s", exc)
