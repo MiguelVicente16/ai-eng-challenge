@@ -114,7 +114,7 @@ def _print_turn(num: int, label: str, user: str, agent: str, elapsed: float) -> 
 
 def _health_check(client: httpx.Client) -> None:
     try:
-        client.get("/health").raise_for_status()
+        client.get("/api/health").raise_for_status()
     except httpx.HTTPError as exc:
         print(f"{YELLOW}❌ Server not reachable at {BASE_URL}: {exc}{RESET}")
         print(f"{YELLOW}   Start it with `make run` in another terminal first.{RESET}")

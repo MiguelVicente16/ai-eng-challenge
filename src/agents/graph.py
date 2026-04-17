@@ -9,6 +9,7 @@ from src.agents.nodes.bouncer import bouncer_node
 from src.agents.nodes.capture_problem import capture_problem_node
 from src.agents.nodes.greeter import greeter_node
 from src.agents.nodes.guardrails import guardrails_node
+from src.agents.nodes.log_turn import log_turn_node
 from src.agents.nodes.opener import opener_node
 from src.agents.nodes.responder import responder_node
 from src.agents.nodes.session_ended import session_ended_node
@@ -109,8 +110,11 @@ def build_graph():
     graph.add_edge("responder", "guardrails")
     graph.add_edge("guardrails", "tts")
 
+    graph.add_node("log_turn", log_turn_node)
+    graph.add_edge("tts", "log_turn")
+
     graph.add_conditional_edges(
-        "tts",
+        "log_turn",
         _route_after_tts,
         {
             "summarizer": "summarizer",

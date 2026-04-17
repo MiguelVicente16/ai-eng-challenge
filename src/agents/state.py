@@ -1,12 +1,20 @@
 """Shared LangGraph state for the customer support agents."""
 
-from typing import TypedDict
+from typing import Annotated, TypedDict
+
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
 from src.agents.flags import Service, Stage, Tier
 
 
 class AgentState(TypedDict, total=False):
     """State shared across all agent nodes. All fields are optional."""
+
+    # Accumulating conversation log — every user turn + every assistant
+    # reply get appended here by `log_turn_node`. The `add_messages` reducer
+    # merges new items across turns instead of overwriting.
+    messages: Annotated[list[BaseMessage], add_messages]
 
     # Input/output text (wrapped by stt/tts nodes)
     input_text: str

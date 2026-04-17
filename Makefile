@@ -18,7 +18,7 @@ test:
 check: lint format-check test
 
 run:
-	uv run uvicorn src.main:app --reload --port 8000
+	uv run uvicorn src.main:app --reload --port 8004
 
 simulate:
 	uv run python scripts/simulate_call.py

@@ -320,6 +320,20 @@ Production deployments should always set `MONGODB_URL`.
   mid-call, we close the WebSocket with 1011; reconnection is the
   client's responsibility. A production deployment would retry with
   backoff and a fresh `thread_id` continuation.
+- **Admin UI streaming mode is disabled** *(known issue)*. The bot opener
+  fires correctly and audio frames flow over the WebSocket, but Deepgram
+  Flux is not yet emitting `EndOfTurn` events for the browser-captured
+  PCM in our current setup. The backend WS lifecycle is sound — the SDK's
+  blocking `connect`/`start_listening`/`close` calls now run on a worker
+  thread (`asyncio.to_thread` + a daemon listener) so the asyncio loop
+  stays responsive and ctrl-C terminates uvicorn cleanly. What's left to
+  validate is the audio pipeline itself: frame size, encoding alignment,
+  or possibly an `eot_threshold` / `eot_timeout_ms` tune. Diagnostic logs
+  (`flux <- type=… event=…`, `flux -> first audio chunk sent`) were
+  added to `src/agents/deepgram/streaming.py` to support the next pass.
+  Push-to-talk mode shares the same graph entry point and is fully
+  working — the admin UI defaults to it and labels Streaming as
+  *(preview)*.
 
 ## Future work
 
