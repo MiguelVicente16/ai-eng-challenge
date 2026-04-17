@@ -142,8 +142,12 @@ async def test_jsonl_store_list_should_return_all_records_newest_first(tmp_path)
 
     # Arrange
     store = JsonlSummaryStore(tmp_path / "sum.jsonl")
-    await store.save({"session_id": "a", "timestamp": "2026-01-01T00:00:00+00:00", "metrics": {"sentiment": "positive"}})
-    await store.save({"session_id": "b", "timestamp": "2026-02-01T00:00:00+00:00", "metrics": {"sentiment": "negative"}})
+    await store.save(
+        {"session_id": "a", "timestamp": "2026-01-01T00:00:00+00:00", "metrics": {"sentiment": "positive"}}
+    )
+    await store.save(
+        {"session_id": "b", "timestamp": "2026-02-01T00:00:00+00:00", "metrics": {"sentiment": "negative"}}
+    )
 
     # Act
     items, total = await store.list(filters={}, skip=0, limit=10)
@@ -159,8 +163,12 @@ async def test_jsonl_store_list_should_filter_by_sentiment(tmp_path):
 
     # Arrange
     store = JsonlSummaryStore(tmp_path / "sum.jsonl")
-    await store.save({"session_id": "a", "timestamp": "2026-01-01T00:00:00+00:00", "metrics": {"sentiment": "positive"}})
-    await store.save({"session_id": "b", "timestamp": "2026-02-01T00:00:00+00:00", "metrics": {"sentiment": "negative"}})
+    await store.save(
+        {"session_id": "a", "timestamp": "2026-01-01T00:00:00+00:00", "metrics": {"sentiment": "positive"}}
+    )
+    await store.save(
+        {"session_id": "b", "timestamp": "2026-02-01T00:00:00+00:00", "metrics": {"sentiment": "negative"}}
+    )
 
     # Act
     items, total = await store.list(filters={"sentiment": "positive"}, skip=0, limit=10)
@@ -177,7 +185,7 @@ async def test_jsonl_store_list_should_paginate(tmp_path):
     # Arrange
     store = JsonlSummaryStore(tmp_path / "sum.jsonl")
     for i in range(5):
-        await store.save({"session_id": f"s{i}", "timestamp": f"2026-01-{i+1:02d}T00:00:00+00:00", "metrics": {}})
+        await store.save({"session_id": f"s{i}", "timestamp": f"2026-01-{i + 1:02d}T00:00:00+00:00", "metrics": {}})
 
     # Act
     page, total = await store.list(filters={}, skip=2, limit=2)
@@ -223,16 +231,20 @@ async def test_jsonl_store_list_should_filter_by_resolved_and_search(tmp_path):
 
     # Arrange
     store = JsonlSummaryStore(tmp_path / "sum.jsonl")
-    await store.save({
-        "session_id": "a",
-        "timestamp": "2026-01-01T00:00:00+00:00",
-        "metrics": {"resolved": True, "summary": "Helped with card fraud", "topics": ["card"]},
-    })
-    await store.save({
-        "session_id": "b",
-        "timestamp": "2026-02-01T00:00:00+00:00",
-        "metrics": {"resolved": False, "summary": "Could not help with loans", "topics": ["loans"]},
-    })
+    await store.save(
+        {
+            "session_id": "a",
+            "timestamp": "2026-01-01T00:00:00+00:00",
+            "metrics": {"resolved": True, "summary": "Helped with card fraud", "topics": ["card"]},
+        }
+    )
+    await store.save(
+        {
+            "session_id": "b",
+            "timestamp": "2026-02-01T00:00:00+00:00",
+            "metrics": {"resolved": False, "summary": "Could not help with loans", "topics": ["loans"]},
+        }
+    )
 
     # Act
     items_true, _ = await store.list(filters={"resolved": True}, skip=0, limit=10)

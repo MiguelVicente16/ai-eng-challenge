@@ -14,15 +14,13 @@ def client_with_temp_configs(tmp_path, monkeypatch):
     phrases = tmp_path / "phrases.yaml"
     metrics = tmp_path / "summary_metrics.yaml"
 
-    routing.write_text(yaml.safe_dump({
-        "services": {
-            "general": {"label": "General", "dept_phone": "+1999", "yes_rules": ["a"], "no_rules": []}
-        }
-    }))
+    routing.write_text(
+        yaml.safe_dump(
+            {"services": {"general": {"label": "General", "dept_phone": "+1999", "yes_rules": ["a"], "no_rules": []}}}
+        )
+    )
     phrases.write_text(yaml.safe_dump({"opener": "Hi"}))
-    metrics.write_text(yaml.safe_dump({
-        "metrics": [{"name": "summary", "type": "string", "description": "d"}]
-    }))
+    metrics.write_text(yaml.safe_dump({"metrics": [{"name": "summary", "type": "string", "description": "d"}]}))
 
     monkeypatch.setattr("src.routers.admin_config.ROUTING_PATH", routing)
     monkeypatch.setattr("src.routers.admin_config.PHRASES_PATH", phrases)
@@ -50,11 +48,7 @@ def test_get_routing_should_return_current_yaml_as_json(client_with_temp_configs
 def test_put_routing_should_write_yaml_and_return_updated_shape(client_with_temp_configs):
     # Arrange
     client, routing_path, _, _ = client_with_temp_configs
-    payload = {
-        "services": {
-            "cards": {"label": "Cards", "dept_phone": "+1555", "yes_rules": ["r1"], "no_rules": []}
-        }
-    }
+    payload = {"services": {"cards": {"label": "Cards", "dept_phone": "+1555", "yes_rules": ["r1"], "no_rules": []}}}
 
     # Act
     response = client.put("/api/config/routing", json=payload)
@@ -140,9 +134,7 @@ def test_put_metrics_should_write_and_bust_all_three_caches(client_with_temp_con
     bust_model = mocker.patch("src.routers.admin_config.build_summary_model")
     bust_prompt = mocker.patch("src.routers.admin_config.build_summary_prompt")
     payload = {
-        "metrics": [
-            {"name": "sentiment", "type": "enum", "values": ["positive", "negative"], "description": "d"}
-        ]
+        "metrics": [{"name": "sentiment", "type": "enum", "values": ["positive", "negative"], "description": "d"}]
     }
 
     # Act

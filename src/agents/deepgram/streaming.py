@@ -80,9 +80,7 @@ class FluxSession:
             conn = ctx.__enter__()
             return ctx, conn
 
-        self._connection_ctx, self._connection = await asyncio.to_thread(
-            _open_connection
-        )
+        self._connection_ctx, self._connection = await asyncio.to_thread(_open_connection)
 
         def _on_message(result) -> None:
             msg_type = getattr(result, "type", None)
@@ -130,8 +128,7 @@ class FluxSession:
         try:
             self._connection.send_media(chunk)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("flux send_media failed after %d chunks: %r",
-                           self._audio_chunks_sent, exc)
+            logger.warning("flux send_media failed after %d chunks: %r", self._audio_chunks_sent, exc)
             raise
         self._audio_chunks_sent += 1
         self._audio_bytes_sent += len(chunk)
@@ -140,8 +137,9 @@ class FluxSession:
         if self._audio_chunks_sent == 1:
             logger.info("flux -> first audio chunk sent (%d bytes)", len(chunk))
         elif self._audio_bytes_sent % (32 * 1024 * 5) < len(chunk):
-            logger.info("flux -> %d chunks / %d KB sent so far",
-                        self._audio_chunks_sent, self._audio_bytes_sent // 1024)
+            logger.info(
+                "flux -> %d chunks / %d KB sent so far", self._audio_chunks_sent, self._audio_bytes_sent // 1024
+            )
 
     async def events(self) -> AsyncIterator[dict]:
         """Yield transcription events until the connection closes."""
@@ -171,15 +169,13 @@ class FluxSession:
                 logger.warning("FluxSession send_close_stream failed: %s", exc)
             if self._connection_ctx is not None:
                 try:
-                    await asyncio.to_thread(
-                        self._connection_ctx.__exit__, None, None, None
-                    )
+                    await asyncio.to_thread(self._connection_ctx.__exit__, None, None, None)
                 except Exception:  # noqa: BLE001
                     pass
 
         try:
             await asyncio.wait_for(_shutdown(), timeout=5.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("FluxSession close timed out — abandoning SDK handle")
 
         if self._listener_thread is not None:

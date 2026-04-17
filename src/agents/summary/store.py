@@ -38,8 +38,10 @@ def _matches(record: dict, filters: dict) -> bool:
         return False
     if q := filters.get("q"):
         needle = q.lower()
-        haystack = (metrics.get("summary") or "").lower() + " " + " ".join(
-            str(t).lower() for t in (metrics.get("topics") or [])
+        haystack = (
+            (metrics.get("summary") or "").lower()
+            + " "
+            + " ".join(str(t).lower() for t in (metrics.get("topics") or []))
         )
         if needle not in haystack:
             return False
@@ -65,9 +67,7 @@ class SummaryStore(ABC):
         """
 
     @abstractmethod
-    async def list(
-        self, filters: dict, skip: int = 0, limit: int = 20
-    ) -> tuple[list[dict], int]:
+    async def list(self, filters: dict, skip: int = 0, limit: int = 20) -> tuple[list[dict], int]:
         """Return (page, total_count). Newest-first. `filters` supports:
         sentiment (str), resolved (bool), q (case-insensitive substring
         on summary+topics), from/to (ISO 8601 strings compared to timestamp).
@@ -120,9 +120,7 @@ class JsonlSummaryStore(SummaryStore):
         async with self._lock:
             return await asyncio.to_thread(_load)
 
-    async def list(
-        self, filters: dict, skip: int = 0, limit: int = 20
-    ) -> tuple[list[dict], int]:
+    async def list(self, filters: dict, skip: int = 0, limit: int = 20) -> tuple[list[dict], int]:
         records = await self._read_all()
         records.sort(key=lambda r: r.get("timestamp") or "", reverse=True)
         filtered = [r for r in records if _matches(r, filters)]
@@ -156,9 +154,7 @@ class MongoSummaryStore(SummaryStore):
     async def save(self, record: dict) -> None:
         await asyncio.to_thread(self._collection.insert_one, record)
 
-    async def list(
-        self, filters: dict, skip: int = 0, limit: int = 20
-    ) -> tuple[list[dict], int]:
+    async def list(self, filters: dict, skip: int = 0, limit: int = 20) -> tuple[list[dict], int]:
         query: dict = {}
         if sentiment := filters.get("sentiment"):
             query["metrics.sentiment"] = sentiment

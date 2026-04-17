@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 
-function _Probe() {
+function Probe() {
   const { theme } = useTheme();
   return <span data-testid="theme">{theme}</span>;
 }
@@ -13,7 +13,7 @@ describe("ThemeProvider", () => {
     // Arrange + Act
     render(
       <ThemeProvider defaultTheme="light" storageKey="test">
-        <_Probe />
+        <Probe />
       </ThemeProvider>,
     );
 

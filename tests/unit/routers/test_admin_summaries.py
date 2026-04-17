@@ -52,7 +52,15 @@ def test_list_summaries_should_forward_filters(client_with_mock_store):
     # Act
     response = client.get(
         "/api/summaries",
-        params={"page": 2, "size": 5, "sentiment": "positive", "resolved": "true", "q": "card", "from": "2026-01-01", "to": "2026-12-31"},
+        params={
+            "page": 2,
+            "size": 5,
+            "sentiment": "positive",
+            "resolved": "true",
+            "q": "card",
+            "from": "2026-01-01",
+            "to": "2026-12-31",
+        },
     )
 
     # Assert

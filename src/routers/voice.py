@@ -136,7 +136,7 @@ async def voice_endpoint(
         # delivery to the parent uvicorn process).
         try:
             await asyncio.wait_for(events_task, timeout=5.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("voice events_task did not finish — cancelling")
             events_task.cancel()
             try:

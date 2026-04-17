@@ -385,11 +385,13 @@ def test_build_record_should_flatten_list_content_messages_to_text():
     from src.agents.summary.summarizer import build_record
 
     # Arrange — AIMessage with list-of-content-blocks (Anthropic tool-use style)
-    msg = AIMessage(content=[
-        {"type": "text", "text": "Let me check that."},
-        {"type": "tool_use", "id": "x", "name": "lookup", "input": {}},
-        {"type": "text", "text": " One moment."},
-    ])
+    msg = AIMessage(
+        content=[
+            {"type": "text", "text": "Let me check that."},
+            {"type": "tool_use", "id": "x", "name": "lookup", "input": {}},
+            {"type": "text", "text": " One moment."},
+        ]
+    )
     state = {"messages": [msg], "caller_phone": None, "stage": "completed"}
 
     class _Stub:
