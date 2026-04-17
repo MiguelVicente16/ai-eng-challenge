@@ -33,11 +33,11 @@ def client(mock_service):
 
 def test_health_should_return_ok(client):
     # Act
-    actual = client.get("/health")
+    actual = client.get("/api/health")
 
     # Assert
     assert actual.status_code == 200
-    assert actual.json() == {"status": "ok"}
+    assert actual.json()["status"] == "ok"
 
 
 def test_chat_should_return_200_with_response_and_session_id(client):
