@@ -3,25 +3,20 @@ import { PTTMode } from "@/features/voice/PTTMode";
 import { StreamingMode } from "@/features/voice/StreamingMode";
 
 export function VoiceContainer() {
-  // Push-to-talk is the default operational mode. Streaming is kept in the
-  // UI for completeness but disabled — see docs/architecture.md → Voice
-  // limitations for the Deepgram Flux pump issue still pending.
+  // Streaming runs the Pipecat pipeline (Deepgram STT → LangGraph bridge →
+  // Deepgram TTS). Push-to-talk still works for low-bandwidth or no-mic
+  // scenarios and is kept as a second tab.
   return (
-    <Tabs defaultValue="ptt" className="w-full">
+    <Tabs defaultValue="stream" className="flex h-full w-full flex-col">
       <TabsList>
+        <TabsTrigger value="stream">Streaming</TabsTrigger>
         <TabsTrigger value="ptt">Push-to-talk</TabsTrigger>
-        <TabsTrigger
-          value="stream"
-          title="Streaming mode is not yet operational — see architecture docs"
-        >
-          Streaming (preview)
-        </TabsTrigger>
       </TabsList>
-      <TabsContent value="ptt" className="mt-4">
-        <PTTMode />
-      </TabsContent>
-      <TabsContent value="stream" className="mt-4">
+      <TabsContent value="stream" className="mt-4 min-h-0 flex-1">
         <StreamingMode />
+      </TabsContent>
+      <TabsContent value="ptt" className="mt-4 min-h-0 flex-1">
+        <PTTMode />
       </TabsContent>
     </Tabs>
   );
