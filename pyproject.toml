@@ -14,6 +14,7 @@ dependencies = [
     "pyyaml>=6.0",
     "langgraph-checkpoint-mongodb>=0.1.0",
     "deepgram-sdk>=3.7.0",
+    "pipecat-ai[deepgram,silero,websocket]>=0.0.71",
 ]
 
 [project.optional-dependencies]
