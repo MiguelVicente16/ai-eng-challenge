@@ -1,132 +1,89 @@
-"""Tests for the /voice WebSocket router."""
+"""Tests for the /voice WebSocket router.
 
-import json
+The router itself is a thin shim: accept, gate on Deepgram key, hand off to
+`run_voice_pipeline`. Pipeline internals (Pipecat wiring, Deepgram, LangGraph
+bridge) are covered in `tests/unit/voice/` — here we only prove the shim's
+two branches.
+"""
 
 import pytest
 from fastapi.testclient import TestClient
 
 
 def test_voice_endpoint_should_close_with_1011_when_deepgram_key_missing(mocker):
+    # Arrange
     from src.main import app
     from src.routers import voice
 
-    # Arrange
-    mocker.patch.object(voice, "_flux_available", return_value=False)
+    mocker.patch.object(voice, "get_deepgram_client", return_value=None)
 
-    # Act + Assert — the server closes the socket after accept, which raises on receive
+    # Act + Assert — the server closes the socket after accept; reading raises.
     client = TestClient(app)
     with pytest.raises(Exception):  # noqa: B017 — starlette raises WebSocketDisconnect
         with client.websocket_connect("/voice") as ws:
             ws.receive_text()
 
 
-def test_voice_endpoint_should_run_chat_service_on_each_end_of_turn(mocker):
-    from src.main import app
-    from src.routers import voice
-    from src.routers.chat import get_chat_service
-    from src.schemas.api import ChatResponse
-
-    # Arrange — stub FluxSession to yield one turn then close
-    class FakeSession:
-        def __init__(self, **kwargs):
-            self.closed = False
-
-        async def start(self):
-            return None
-
-        def send_audio(self, chunk):
-            pass
-
-        async def events(self):
-            yield {"type": "turn", "transcript": "I need yacht insurance"}
-
-        async def close(self):
-            self.closed = True
-
-    mocker.patch.object(voice, "FluxSession", FakeSession)
-    mocker.patch.object(voice, "_flux_available", return_value=True)
-    mocker.patch.object(voice, "synthesize_speech", mocker.AsyncMock(return_value=b""))
-
-    chat_service = mocker.MagicMock()
-    chat_service.handle_message = mocker.AsyncMock(
-        return_value=ChatResponse(
-            response="Routing you to Insurance",
-            session_id="s-1",
-            audio_base64=None,
-        )
-    )
-    app.dependency_overrides[get_chat_service] = lambda: chat_service
-
-    try:
-        client = TestClient(app)
-        frames: list[str] = []
-        with client.websocket_connect("/voice") as ws:
-            ws.send_bytes(b"\x00\x00")  # a fake audio frame
-            ws.send_text("__end__")
-            # Drain until the server closes. Expect at least two "turn"
-            # frames: the bot opener (empty transcript) and the real turn.
-            try:
-                while True:
-                    frames.append(ws.receive_text())
-            except Exception:  # noqa: BLE001
-                pass
-    finally:
-        app.dependency_overrides.clear()
-
-    # Assert
-    turn_frames = [json.loads(f) for f in frames if json.loads(f)["type"] == "turn"]
-    transcripts = [p["transcript"] for p in turn_frames]
-    assert "" in transcripts  # opener has empty transcript
-    assert "I need yacht insurance" in transcripts
-    yacht_turn = next(p for p in turn_frames if p["transcript"] == "I need yacht insurance")
-    assert yacht_turn["response"] == "Routing you to Insurance"
-    # Opener + real turn → handle_message called twice.
-    assert chat_service.handle_message.await_count == 2
-
-
-def test_voice_endpoint_should_stream_tts_audio_binary_frame_when_synthesized(mocker):
-    from src.main import app
-    from src.routers import voice
-    from src.routers.chat import get_chat_service
-    from src.schemas.api import ChatResponse
-
+def test_voice_endpoint_should_delegate_to_run_voice_pipeline_when_configured(mocker):
     # Arrange
-    class FakeSession:
-        def __init__(self, **kwargs):
-            pass
+    from src.main import app
+    from src.routers import voice
+    from src.routers.chat import get_chat_service
 
-        async def start(self):
-            return None
+    mocker.patch.object(voice, "get_deepgram_client", return_value=object())
 
-        def send_audio(self, chunk):
-            pass
+    # Close the socket from inside the stub so the client-side context manager
+    # can exit cleanly instead of hanging on an open WS.
+    async def _close_ws(ws, _cs):
+        await ws.close()
 
-        async def events(self):
-            yield {"type": "turn", "transcript": "help"}
-
-        async def close(self):
-            return None
-
-    mocker.patch.object(voice, "FluxSession", FakeSession)
-    mocker.patch.object(voice, "_flux_available", return_value=True)
-    mocker.patch.object(voice, "synthesize_speech", mocker.AsyncMock(return_value=b"mp3-chunk"))
+    run_pipeline = mocker.patch.object(
+        voice,
+        "run_voice_pipeline",
+        new_callable=mocker.AsyncMock,
+        side_effect=_close_ws,
+    )
 
     chat_service = mocker.MagicMock()
-    chat_service.handle_message = mocker.AsyncMock(return_value=ChatResponse(response="hello", session_id="s-2"))
     app.dependency_overrides[get_chat_service] = lambda: chat_service
 
     try:
         client = TestClient(app)
-        with client.websocket_connect("/voice") as ws:
-            ws.send_text("__end__")
-            ws.receive_text()  # JSON turn payload
-            audio_frame = ws.receive_bytes()  # MP3 binary frame
-            try:
-                while True:
-                    ws.receive_text()
-            except Exception:  # noqa: BLE001
-                pass
+        with client.websocket_connect("/voice"):
+            pass
     finally:
         app.dependency_overrides.clear()
 
-    assert audio_frame == b"mp3-chunk"
+    # Assert — the shim calls run_voice_pipeline once with our chat_service.
+    run_pipeline.assert_awaited_once()
+    _ws_arg, cs_arg = run_pipeline.await_args.args
+    assert cs_arg is chat_service
+
+
+def test_voice_endpoint_should_log_and_swallow_pipeline_failures(mocker, caplog):
+    # Arrange
+    from src.main import app
+    from src.routers import voice
+    from src.routers.chat import get_chat_service
+
+    mocker.patch.object(voice, "get_deepgram_client", return_value=object())
+    mocker.patch.object(
+        voice,
+        "run_voice_pipeline",
+        new_callable=mocker.AsyncMock,
+        side_effect=RuntimeError("boom"),
+    )
+
+    chat_service = mocker.MagicMock()
+    app.dependency_overrides[get_chat_service] = lambda: chat_service
+
+    try:
+        client = TestClient(app)
+        # The server swallows the RuntimeError and the WS is torn down.
+        with pytest.raises(Exception):  # noqa: B017
+            with client.websocket_connect("/voice") as ws:
+                ws.receive_text()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert any("pipeline failed" in record.message for record in caplog.records)
