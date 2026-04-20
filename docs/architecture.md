@@ -254,21 +254,24 @@ The STT/TTS nodes are no longer placeholders. Both endpoints — `/chat` and
   `output_text` and returns the MP3 bytes under a new `audio_base64`
   response field. Text-only requests still work exactly as before — when
   `audio_base64` is absent, both nodes pass through.
-- **Streaming mode (`/voice`)**: a new WebSocket endpoint accepts raw
-  linear16 16 kHz mono PCM frames. They're forwarded to a Deepgram Flux
-  (`listen.v2`) connection, which groups them into turns and emits an
-  `EndOfTurn` event on natural pauses (controlled by `eot_threshold` and
-  `eot_timeout_ms`). Each turn becomes one `ChatService.handle_message`
-  call — exactly the same entry point as `/chat`, with the same graph,
-  checkpointer, and thread_id semantics. The reply is streamed back as a
-  JSON text frame plus an Aura-encoded MP3 binary frame.
+- **Streaming mode (`/voice`)**: a WebSocket endpoint driven by a
+  [Pipecat](https://github.com/pipecat-ai/pipecat) pipeline. Pipecat owns
+  the audio framing, Silero VAD, and turn-taking; Deepgram Nova streams
+  the STT, Deepgram Aura streams the TTS, and the only custom piece is a
+  thin `LangGraphBridge` `FrameProcessor` that consumes final
+  `TranscriptionFrame`s and calls `ChatService.handle_message` — the same
+  entry point as `/chat`, with the same graph, checkpointer, and
+  thread_id semantics. The RTVI protocol (protobuf-serialized frames
+  over the WS) carries everything back to the browser: user transcripts,
+  streamed bot text, and PCM audio. The opener is fired once on the
+  server's `on_client_ready` event, so there's no opening gap.
 
-**Why Deepgram Flux specifically.** Flux is purpose-built for phone-call
-voice agents: it does end-of-turn detection server-side so the client
-doesn't need to implement voice activity detection. One incoming turn = one
-outbound graph invocation — the natural unit for our stage router. It also
-gives us a single provider for both STT and TTS, so the setup story is one
-env var (`DEEPGRAM_API_KEY`) and one SDK.
+**Why Pipecat.** The hand-rolled Deepgram Flux WS we shipped earlier
+fought audio framing, VAD, and interruption handling. Pipecat packages
+all three as composable `FrameProcessor`s, so our code shrinks to the
+one bit that's actually ours (the graph bridge) and the provider stack
+swaps with one line (e.g. Cartesia TTS, nova-3 STT, or Silero → VAD off).
+We still get a single provider for STT + TTS via Deepgram.
 
 **Opt-in, like MongoDB.** `DEEPGRAM_API_KEY` is optional. When unset:
 `/chat` ignores `audio_base64` and the existing flow is unchanged; `/voice`
@@ -311,29 +314,14 @@ Production deployments should always set `MONGODB_URL`.
   for one full Nova transcription and one full Aura synthesis before
   replying. This is fine for phone IVR tests but slower than real
   streaming. `/voice` exists precisely to avoid that cost.
-- **`/voice` is single-turn streaming with batch TTS**. Flux handles the
-  inbound streaming. The outbound reply is synthesized in one Aura batch
-  call per turn rather than streamed chunk-by-chunk — good enough for
-  short phrases but noticeable on long premium responses. Streaming Aura
-  output is straightforward but out of scope.
-- **No voice activity fallback**. If Deepgram Flux drops the connection
-  mid-call, we close the WebSocket with 1011; reconnection is the
-  client's responsibility. A production deployment would retry with
-  backoff and a fresh `thread_id` continuation.
-- **Admin UI streaming mode is disabled** *(known issue)*. The bot opener
-  fires correctly and audio frames flow over the WebSocket, but Deepgram
-  Flux is not yet emitting `EndOfTurn` events for the browser-captured
-  PCM in our current setup. The backend WS lifecycle is sound — the SDK's
-  blocking `connect`/`start_listening`/`close` calls now run on a worker
-  thread (`asyncio.to_thread` + a daemon listener) so the asyncio loop
-  stays responsive and ctrl-C terminates uvicorn cleanly. What's left to
-  validate is the audio pipeline itself: frame size, encoding alignment,
-  or possibly an `eot_threshold` / `eot_timeout_ms` tune. Diagnostic logs
-  (`flux <- type=… event=…`, `flux -> first audio chunk sent`) were
-  added to `src/agents/deepgram/streaming.py` to support the next pass.
-  Push-to-talk mode shares the same graph entry point and is fully
-  working — the admin UI defaults to it and labels Streaming as
-  *(preview)*.
+- **No reconnection on WS drop**. If the Pipecat pipeline tears down
+  mid-call (Deepgram hiccup, network blip), we close the WebSocket;
+  reconnection is the client's responsibility. A production deployment
+  would retry with backoff and a fresh `thread_id` continuation.
+- **Single-region Deepgram**. Both STT and TTS round-trip to Deepgram's
+  us-east cluster. Latency from other regions adds ~100–200 ms per turn.
+  Pipecat supports swapping in a regional STT/TTS service in one line if
+  that becomes a real constraint.
 
 ## Future work
 
